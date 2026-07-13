@@ -19,3 +19,11 @@ reports/*
 *.log
 
 .ipynb_checkpoints/
+
+!data/raw/.gitkeep
+!data/validated/.gitkeep
+!data/features/.gitkeep
+!data/market/.gitkeep
+!cache/.gitkeep
+!logs/.gitkeep
+!reports/.gitkeep
