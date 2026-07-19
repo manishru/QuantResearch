@@ -95,3 +95,13 @@ snapshot only. Other strategy families remain unranked because their
 assumptions and out-of-sample evidence are not comparable. Pending horizon
 comparison may supersede this rule only using the predeclared 2010–2024 train
 and 2025–2026 forward test.
+
+### Historical sector-overlay data requirement — 2026-07-19
+
+Do not use the current EODHD sector classification or current ETF holdings as
+the definitive historical parent-sector mapping for Golden 1 lots. A valid
+all-sector overlay needs dated sector/GICS classification for each ticker and,
+if the claim is ETF constituent membership rather than sector exposure, dated
+ETF holdings. `build_golden1_current_sector_proxy.py` is retained only for
+clearly labelled exploratory work. The combined Golden 1 sector-ETF exit test
+is pending a point-in-time classification/holdings source.
