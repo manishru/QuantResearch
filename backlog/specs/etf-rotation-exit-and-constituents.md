@@ -105,3 +105,13 @@ if the claim is ETF constituent membership rather than sector exposure, dated
 ETF holdings. `build_golden1_current_sector_proxy.py` is retained only for
 clearly labelled exploratory work. The combined Golden 1 sector-ETF exit test
 is pending a point-in-time classification/holdings source.
+
+### Rotation-horizon result — 2026-07-19
+
+Using the fixed 20/50 top-1 constituent and 10% rotation-exit rule, horizons
+were trained on 2010–2024 and evaluated without retuning on 2025–2026-07-17.
+The 21-session horizon remained strongest in both samples: train 23.06%
+average individual-trade return, 57.84% win rate (1,257 trades); forward
+10.31%, 60.00% win rate (110 trades). The 5/10/15-session forward returns
+were 3.48%/3.78%/1.46%, with win rates below 48%. Do not replace Golden 2's
+21-session horizon with a faster horizon based on this test.
