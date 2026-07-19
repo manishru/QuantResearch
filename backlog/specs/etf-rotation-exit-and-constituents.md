@@ -83,3 +83,14 @@ The rule was not resilient through every regime: 2001 averaged -5.90% and
 2008 averaged -8.57% with a 17.4% win rate. It recovered strongly in 2009
 (+23.66% average). This reinforces that it is an event study and needs risk
 controls; do not treat it as an all-weather or live-trading strategy.
+
+### Golden strategy decision — 2026-07-19
+
+The frozen 20/50, top-1 constituent, ETF relative-volume/breadth entry and
+10% ETF rotation exit was recorded as **Golden 1** in
+`docs/golden_strategy_registry.md`. The label applies to the rule, not to a
+permanent ticker. The July 17 XLF screen (FITB, USB, STT) is an auditable
+snapshot only. Other strategy families remain unranked because their
+assumptions and out-of-sample evidence are not comparable. Pending horizon
+comparison may supersede this rule only using the predeclared 2010–2024 train
+and 2025–2026 forward test.
