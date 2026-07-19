@@ -99,7 +99,7 @@ def main() -> None:
     with (args.output / 'etf_rotation.csv').open('w', newline='') as handle:
         writer = csv.DictWriter(handle, fieldnames=fields); writer.writeheader(); writer.writerows(sorted(report, key=lambda row: row.get('rotation_rank', 999999)))
     missing = [row for row in report if not row.get('return_vs_spy')]
-    metadata = {'top_requested': args.top, 'etfs_selected': len(selected), 'lookback_sessions': args.lookback_sessions, 'min_relative_volume': args.min_relative_volume, 'valid_rotation_rows': len(valid), 'missing_or_unavailable': [{'ticker': row['ticker'], 'status': row['eodhd_status']} for row in missing], 'limitation': 'Price/volume leadership is a rotation proxy, not confirmed institutional capital flow.'}
+    metadata = {'top_requested': args.top, 'etfs_selected': len(selected), 'lookback_sessions': args.lookback_sessions, 'min_relative_volume': args.min_relative_volume, 'valid_rotation_rows': len(valid), 'missing_or_unavailable': [{'ticker': row['ticker'], 'eodhd_symbol': row['eodhd_symbol'], 'status': row['eodhd_status']} for row in missing], 'limitation': 'Price/volume leadership is a rotation proxy, not confirmed institutional capital flow.'}
     (args.output / 'summary.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(json.dumps(metadata, indent=2))
 
