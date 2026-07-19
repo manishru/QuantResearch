@@ -19,6 +19,10 @@ long-only research rule.  It is not investment advice or order execution.
 The default `--max-open-lots-per-ticker 52` permits one weekly lot for up to a
 year. It may be reduced for a concentration limit.
 
+`--top-n 3` selects only the three strongest qualifying breakouts across the
+whole point-in-time S&P 500 on each entry date. Strength is the completed
+weekly close divided by the prior breakout high, minus one.
+
 ## Run 2010 through 2025
 
 ```zsh
@@ -30,6 +34,7 @@ PYTHONPATH=src .venv/bin/python scripts/backtest_weekly_breakout_supertrend.py \
   --breakout-weeks 13 \
   --supertrend-period 10 \
   --supertrend-multiplier 3 \
+  --top-n 3 \
   --allocation 1000 \
   --max-open-lots-per-ticker 52 \
   --output reports/weekly_breakout_13w_supertrend_10_3_2010_2025
@@ -43,6 +48,7 @@ PYTHONPATH=src .venv/bin/python scripts/backtest_weekly_breakout_supertrend.py \
   --breakout-weeks 8 --breakout-weeks 10 --breakout-weeks 13 \
   --breakout-weeks 20 --breakout-weeks 26 \
   --supertrend-period 10 --supertrend-multiplier 3 \
+  --top-n 3 \
   --allocation 1000 --max-open-lots-per-ticker 52 \
   --output reports/weekly_breakout_lookback_matrix_2010_2025
 ```

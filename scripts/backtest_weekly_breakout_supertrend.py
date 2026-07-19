@@ -123,6 +123,7 @@ def simulate(
     allocation: float,
     cost: float,
     max_open_lots_per_ticker: int,
+    top_n: int,
 ) -> list[dict[str, object]]:
     trades: list[dict[str, object]] = []
     config = SupertrendConfig(
@@ -130,39 +131,24 @@ def simulate(
     )
     label = format(supertrend_multiplier, "g").replace(".", "p")
     green_key = f"supertrend_green_{supertrend_period}_{label}"
+    entry_candidates: dict[date, list[dict[str, object]]] = defaultdict(list)
+    exit_events: dict[date, dict[str, str]] = defaultdict(dict)
     for ticker, daily in sorted(prices.items()):
         weekly = aggregate_weeks(ticker, daily)
         features = compute_supertrend_features([item.bar for item in weekly], config)
         green = {row.date: bool(row.values[green_key]) for row in features}
-        positions: list[dict[str, object]] = []
         for index, item in enumerate(weekly):
             if item.week_end < start or item.week_end > end:
                 continue
             execution = next_week_open(daily, item.week_end)
             if execution is None or execution.observed > end:
                 continue
-            if positions:
-                # The red condition is known only after this completed week.
-                if not green.get(item.week_end, False):
-                    for position in positions:
-                        exit_price = execution.open_price * (1 - cost)
-                        proceeds = float(position["shares"]) * exit_price
-                        trades.append({
-                            **position,
-                            "exit_signal_date": item.week_end.isoformat(),
-                            "exit_date": execution.observed.isoformat(),
-                            "exit_price": exit_price,
-                            "exit_reason": "weekly_supertrend_red",
-                            "proceeds": proceeds,
-                            "return_pct": proceeds / allocation - 1,
-                            "holding_days": (execution.observed - date.fromisoformat(str(position["entry_date"]))).days,
-                            "status": "closed",
-                        })
-                    positions = []
-                # An existing position does not suppress a fresh, qualifying
-                # weekly breakout.  A new fixed-dollar lot may be added below.
-            if (index < breakout_weeks or not green.get(item.week_end, False)
-                    or len(positions) >= max_open_lots_per_ticker):
+            # A red condition is known at this completed weekly close and is
+            # executable only at the following week's first market open.
+            if not green.get(item.week_end, False):
+                exit_events[execution.observed][ticker] = item.week_end.isoformat()
+                continue
+            if index < breakout_weeks:
                 continue
             prior_high = max(previous.bar.high for previous in weekly[index - breakout_weeks:index])
             if item.bar.close <= prior_high:
@@ -170,9 +156,7 @@ def simulate(
             # Enforce point-in-time membership at both decision and execution.
             if not in_universe(intervals, ticker, item.week_end) or not in_universe(intervals, ticker, execution.observed):
                 continue
-            entry_price = execution.open_price * (1 + cost)
-            shares = allocation / entry_price
-            positions.append({
+            entry_candidates[execution.observed].append({
                 "ticker": ticker,
                 "breakout_weeks": breakout_weeks,
                 "supertrend_period": supertrend_period,
@@ -182,25 +166,56 @@ def simulate(
                 "breakout_level": prior_high,
                 "weekly_close": item.bar.close,
                 "entry_date": execution.observed.isoformat(),
-                "entry_price": entry_price,
-                "shares": shares,
+                "entry_strength": item.bar.close / prior_high - 1,
             })
-        if positions:
-            last = next((item for item in reversed(daily) if item.observed <= end), None)
-            if last is not None:
-                for position in positions:
-                    proceeds = float(position["shares"]) * last.close * (1 - cost)
-                    trades.append({
-                        **position,
-                        "exit_signal_date": "",
-                        "exit_date": last.observed.isoformat(),
-                        "exit_price": last.close * (1 - cost),
-                        "exit_reason": "open_mark_to_market_at_end",
-                        "proceeds": proceeds,
-                        "return_pct": proceeds / allocation - 1,
-                        "holding_days": (last.observed - date.fromisoformat(str(position["entry_date"]))).days,
-                        "status": "open_marked",
-                    })
+
+    # Select the strongest N breakouts across the entire index on each entry
+    # date, rather than taking every stock that qualified that week.
+    selected_entries = {
+        observed: sorted(candidates, key=lambda candidate: (-float(candidate["entry_strength"]), str(candidate["ticker"])))[:top_n]
+        for observed, candidates in entry_candidates.items()
+    }
+    positions: dict[str, list[dict[str, object]]] = defaultdict(list)
+    event_dates = sorted(set(selected_entries) | set(exit_events))
+    for observed in event_dates:
+        # Exit first. Both exit and entry use this session's open, but a ticker
+        # cannot be green and red on the same completed weekly bar.
+        for ticker, signal_date in sorted(exit_events[observed].items()):
+            opening = next((bar for bar in prices[ticker] if bar.observed == observed), None)
+            if opening is None:
+                continue
+            for position in positions.pop(ticker, []):
+                exit_price = opening.open_price * (1 - cost)
+                proceeds = float(position["shares"]) * exit_price
+                trades.append({
+                    **position, "exit_signal_date": signal_date, "exit_date": observed.isoformat(),
+                    "exit_price": exit_price, "exit_reason": "weekly_supertrend_red", "proceeds": proceeds,
+                    "return_pct": proceeds / allocation - 1,
+                    "holding_days": (observed - date.fromisoformat(str(position["entry_date"]))).days,
+                    "status": "closed",
+                })
+        for candidate in selected_entries.get(observed, []):
+            ticker = str(candidate["ticker"])
+            if len(positions[ticker]) >= max_open_lots_per_ticker:
+                continue
+            opening = next((bar for bar in prices[ticker] if bar.observed == observed), None)
+            if opening is None:
+                continue
+            entry_price = opening.open_price * (1 + cost)
+            positions[ticker].append({**candidate, "entry_price": entry_price, "shares": allocation / entry_price})
+    for ticker, ticker_positions in positions.items():
+        last = next((item for item in reversed(prices[ticker]) if item.observed <= end), None)
+        if last is None:
+            continue
+        for position in ticker_positions:
+            proceeds = float(position["shares"]) * last.close * (1 - cost)
+            trades.append({
+                **position, "exit_signal_date": "", "exit_date": last.observed.isoformat(),
+                "exit_price": last.close * (1 - cost), "exit_reason": "open_mark_to_market_at_end",
+                "proceeds": proceeds, "return_pct": proceeds / allocation - 1,
+                "holding_days": (last.observed - date.fromisoformat(str(position["entry_date"]))).days,
+                "status": "open_marked",
+            })
     return trades
 
 
@@ -215,17 +230,21 @@ def main() -> None:
     parser.add_argument("--allocation", type=float, default=1_000.0, help="Fixed dollars per trade; default: 1000")
     parser.add_argument("--max-open-lots-per-ticker", type=int, default=52,
                         help="Maximum concurrently open weekly lots in one ticker; default: 52")
+    parser.add_argument("--top-n", type=int, action="append", default=None,
+                        help="Strongest breakouts selected across the S&P 500 each week; default: 3")
     parser.add_argument("--cost", type=float, default=0.0, help="One-way proportional execution cost; default: 0")
     parser.add_argument("--exclude-ticker", action="append", default=["CVC"])
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.end <= args.start:
         parser.error("--end must be after --start")
-    if args.allocation <= 0 or args.max_open_lots_per_ticker < 1 or not 0 <= args.cost < 1:
+    if (args.allocation <= 0 or args.max_open_lots_per_ticker < 1
+            or any(value < 1 for value in (args.top_n or [3])) or not 0 <= args.cost < 1):
         parser.error("--allocation must be positive and --cost must be in [0, 1)")
     breakouts = sorted(set(args.breakout_weeks or [13]))
     periods = sorted(set(args.supertrend_period or [10]))
     multipliers = sorted(set(args.supertrend_multiplier or [3.0]))
+    top_values = sorted(set(args.top_n or [3]))
     if any(value < 2 for value in breakouts) or any(value < 1 for value in periods) or any(value <= 0 for value in multipliers):
         parser.error("breakout weeks must be >=2; Supertrend period and multiplier must be positive")
 
@@ -284,28 +303,30 @@ def main() -> None:
     summary: list[dict[str, object]] = []
     trade_headers = [
         "ticker", "breakout_weeks", "supertrend_period", "supertrend_multiplier", "allocation",
-        "signal_date", "breakout_level", "weekly_close", "entry_date", "entry_price", "shares",
+        "signal_date", "breakout_level", "weekly_close", "entry_strength", "entry_date", "entry_price", "shares",
         "exit_signal_date", "exit_date", "exit_price", "exit_reason", "proceeds", "return_pct",
         "holding_days", "status",
     ]
     for breakout in breakouts:
         for period in periods:
             for multiplier in multipliers:
-                trades = simulate(prices=prices, intervals=intervals, start=args.start, end=args.end,
-                                  breakout_weeks=breakout, supertrend_period=period,
-                                  supertrend_multiplier=multiplier, allocation=args.allocation, cost=args.cost,
-                                  max_open_lots_per_ticker=args.max_open_lots_per_ticker)
-                closed = [trade for trade in trades if trade["status"] == "closed"]
-                total_invested = args.allocation * len(trades)
-                proceeds = sum(float(trade["proceeds"]) for trade in trades)
-                flows = [(date.fromisoformat(str(trade["entry_date"])), -args.allocation) for trade in trades]
-                flows.extend((date.fromisoformat(str(trade["exit_date"])), float(trade["proceeds"])) for trade in trades)
-                returns = [float(trade["return_pct"]) for trade in trades]
-                rule_name = f"breakout_{breakout}w_supertrend_{period}_{format(multiplier, 'g')}"
-                write_csv(trades_dir / f"{rule_name}_trades.csv", trades, trade_headers)
-                summary.append({
+                for top_n in top_values:
+                    trades = simulate(prices=prices, intervals=intervals, start=args.start, end=args.end,
+                                      breakout_weeks=breakout, supertrend_period=period,
+                                      supertrend_multiplier=multiplier, allocation=args.allocation, cost=args.cost,
+                                      max_open_lots_per_ticker=args.max_open_lots_per_ticker, top_n=top_n)
+                    closed = [trade for trade in trades if trade["status"] == "closed"]
+                    total_invested = args.allocation * len(trades)
+                    proceeds = sum(float(trade["proceeds"]) for trade in trades)
+                    flows = [(date.fromisoformat(str(trade["entry_date"])), -args.allocation) for trade in trades]
+                    flows.extend((date.fromisoformat(str(trade["exit_date"])), float(trade["proceeds"])) for trade in trades)
+                    returns = [float(trade["return_pct"]) for trade in trades]
+                    rule_name = f"breakout_{breakout}w_supertrend_{period}_{format(multiplier, 'g')}_top{top_n}"
+                    write_csv(trades_dir / f"{rule_name}_trades.csv", trades, trade_headers)
+                    summary.append({
                     "strategy_rule": rule_name, "breakout_weeks": breakout,
                     "supertrend_period": period, "supertrend_multiplier": multiplier,
+                    "top_n": top_n,
                     "trade_count": len(trades), "closed_trade_count": len(closed),
                     "open_marked_count": len(trades) - len(closed), "invested_capital": total_invested,
                     "net_proceeds": proceeds, "net_profit": proceeds - total_invested,
@@ -315,7 +336,7 @@ def main() -> None:
                     "win_rate": sum(value > 0 for value in returns) / len(returns) if returns else None,
                     "cost_per_side": args.cost,
                     "trades_file": str((trades_dir / f"{rule_name}_trades.csv").relative_to(output)),
-                })
+                    })
     summary.sort(key=lambda item: (item["xirr"] is not None, item["xirr"] or -9999), reverse=True)
     write_csv(output / "comparison.csv", summary, list(summary[0]) if summary else ["strategy_rule"])
     print(json.dumps({
