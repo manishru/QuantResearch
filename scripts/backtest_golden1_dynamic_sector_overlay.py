@@ -48,7 +48,8 @@ def main():
   row=dict(r);ticker=row['ticker'];entry=date.fromisoformat(row['execution_date']);base_exit=date.fromisoformat(row['exit_date'] or row['valuation_date']);bars=stock.get(ticker,[]);hist=[(d,c) for d,c in bars if d<entry]
   best=None
   if len(hist)>a.correlation_sessions:
-   sr={d:hist[i][1]/hist[i-1][1]-1 for i,(d,_) in enumerate(hist[-(a.correlation_sessions+1):]) if i>0}
+   recent=hist[-(a.correlation_sessions+1):]
+   sr={d.isoformat():recent[i][1]/recent[i-1][1]-1 for i,(d,_) in enumerate(recent) if i>0}
    for symbol,data in etf.items():
     dates={r['date']:float(r['adjusted_close']) for r in data};shared=sorted(set(sr)&set(dates));shared=[d for d in shared if d<entry.isoformat()][-a.correlation_sessions:]
     er=[dates[d]/dates[sorted(dates).index(d)-1] - 1 if False else 0 for d in []]
