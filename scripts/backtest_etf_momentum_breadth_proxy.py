@@ -67,11 +67,11 @@ def constituent_tickers(path: Path) -> set[str]:
         return {row["ticker"].upper().strip().replace(".", "-") for row in csv.DictReader(handle) if row.get("ticker", "").strip()}
 
 
-def build_etf_features(rows: list[dict[str, object]], benchmark: dict[str, float]) -> list[dict[str, object]]:
+def build_etf_features(rows: list[dict[str, object]], benchmark: dict[str, float], lookback: int) -> list[dict[str, object]]:
     result: list[dict[str, object]] = []
-    for index in range(21, len(rows)):
-        item, prior = rows[index], rows[index - 21]
-        recent_volumes = [float(value["volume"]) for value in rows[index - 21:index] if float(value["volume"]) > 0]
+    for index in range(lookback, len(rows)):
+        item, prior = rows[index], rows[index - lookback]
+        recent_volumes = [float(value["volume"]) for value in rows[index - lookback:index] if float(value["volume"]) > 0]
         if not recent_volumes:
             continue
         observed = str(item["date"])
@@ -109,11 +109,11 @@ def local_component_prices(parquet: Path, tickers: set[str], start: date, end: d
     return grouped
 
 
-def breadth_by_date(prices: dict[str, list[dict[str, object]]]) -> dict[str, dict[str, object]]:
+def breadth_by_date(prices: dict[str, list[dict[str, object]]], lookback: int) -> dict[str, dict[str, object]]:
     daily: dict[str, list[tuple[str, float]]] = defaultdict(list)
     for ticker, rows in prices.items():
-        for index in range(21, len(rows)):
-            daily[str(rows[index]["date"])].append((ticker, float(rows[index]["close"]) / float(rows[index - 21]["close"]) - 1))
+        for index in range(lookback, len(rows)):
+            daily[str(rows[index]["date"])].append((ticker, float(rows[index]["close"]) / float(rows[index - lookback]["close"]) - 1))
     result: dict[str, dict[str, object]] = {}
     for observed, values in daily.items():
         positive = [ticker for ticker, value in values if value > 0]
@@ -134,13 +134,15 @@ def main() -> None:
     parser.add_argument("--token-env", default="EODHD_API_TOKEN")
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--holding-sessions", type=int, default=21)
+    parser.add_argument("--lookback-sessions", type=int, default=21,
+                        help="ETF strength, ETF volume, and breadth horizon; default: 21")
     parser.add_argument("--minimum-breadth", type=float, default=0.55)
     parser.add_argument("--minimum-relative-volume", type=float, default=1.0)
     args = parser.parse_args()
     if args.start >= args.to:
         parser.error("--from must be before --to")
-    if args.holding_sessions < 1:
-        parser.error("--holding-sessions must be positive")
+    if args.holding_sessions < 1 or args.lookback_sessions < 2:
+        parser.error("--holding-sessions must be positive and --lookback-sessions must be at least 2")
     if not 0 < args.minimum_breadth <= 1:
         parser.error("--minimum-breadth must be in (0, 1]")
     token = os.environ.get(args.token_env)
@@ -162,7 +164,7 @@ def main() -> None:
         return json.loads(path.read_text(encoding="utf-8"))
 
     spy_rows = cached("SPY.US")
-    spy_features = build_etf_features(spy_rows, {str(row["date"]): 0 for row in spy_rows})
+    spy_features = build_etf_features(spy_rows, {str(row["date"]): 0 for row in spy_rows}, args.lookback_sessions)
     spy_returns = {str(row["date"]): float(row["return_21d"]) for row in spy_features}
     summaries: list[dict[str, object]] = []
     events: list[dict[str, object]] = []
@@ -180,8 +182,8 @@ def main() -> None:
             continue
         tickers = constituent_tickers(lists / basket.constituents) if basket.constituents else set()
         components = local_component_prices(parquet, tickers, args.start, args.to) if tickers else {}
-        breadth = breadth_by_date(components) if components else {}
-        features = build_etf_features(etf_rows, spy_returns)
+        breadth = breadth_by_date(components, args.lookback_sessions) if components else {}
+        features = build_etf_features(etf_rows, spy_returns, args.lookback_sessions)
         feature_by_date = {str(row["date"]): row for row in features}
         ordered_dates = [str(row["date"]) for row in features]
         active_previous = False
@@ -192,7 +194,7 @@ def main() -> None:
             breadth_pass = bool(component_state) and float(component_state["breadth"]) >= args.minimum_breadth if basket.constituents else True
             is_active = relative_strength > 0 and float(feature["relative_volume"]) >= args.minimum_relative_volume and breadth_pass
             breadth_rows.append({
-                "basket": basket.name, "etf": basket.etf, "date": observed,
+                "basket": basket.name, "etf": basket.etf, "date": observed, "lookback_sessions": args.lookback_sessions,
                 "etf_return_21d": feature["return_21d"], "spy_return_21d": feature["spy_return_21d"],
                 "relative_strength_21d": relative_strength, "etf_relative_volume": feature["relative_volume"],
                 "constituent_breadth_21d": component_state["breadth"] if component_state else "",
@@ -209,7 +211,7 @@ def main() -> None:
                     if entry_date in rows and exit_date in rows:
                         component_returns.append(rows[exit_date] / rows[entry_date] - 1)
                         constituents_at_entry.append({"basket": basket.name, "signal_date": observed, "entry_date": entry_date, "exit_date": exit_date, "ticker": ticker, "weight": 1 / len(component_state["positive_tickers"]), "return": component_returns[-1], "weight_method": "equal_weight_positive_breadth_proxy"})
-                event = {"basket": basket.name, "etf": basket.etf, "signal_date": observed, "entry_date": entry_date, "exit_date": exit_date, "holding_sessions": args.holding_sessions, "etf_return": etf_return, "constituent_equal_weight_return": fmean(component_returns) if component_returns else "", "constituent_count": len(component_returns), "signal_breadth": component_state["breadth"] if component_state else "", "signal_relative_strength_21d": relative_strength, "signal_relative_volume": feature["relative_volume"], "constituent_method": basket.method}
+                event = {"basket": basket.name, "etf": basket.etf, "signal_date": observed, "entry_date": entry_date, "exit_date": exit_date, "holding_sessions": args.holding_sessions, "lookback_sessions": args.lookback_sessions, "etf_return": etf_return, "constituent_equal_weight_return": fmean(component_returns) if component_returns else "", "constituent_count": len(component_returns), "signal_breadth": component_state["breadth"] if component_state else "", "signal_relative_strength_21d": relative_strength, "signal_relative_volume": feature["relative_volume"], "constituent_method": basket.method}
                 events.append(event)
                 basket_events.append(event)
             active_previous = is_active
@@ -218,8 +220,8 @@ def main() -> None:
         summaries.append({"basket": basket.name, "etf": basket.etf, "status": "ok", "signals": len(basket_events), "average_etf_return": fmean(etf_returns) if etf_returns else "", "etf_win_rate": sum(value > 0 for value in etf_returns) / len(etf_returns) if etf_returns else "", "average_constituent_equal_weight_return": fmean(stock_returns) if stock_returns else "", "constituent_win_rate": sum(value > 0 for value in stock_returns) / len(stock_returns) if stock_returns else "", "available_current_constituents": len(components), "constituent_method": basket.method})
 
     write_csv(output / "strategy_summary.csv", summaries, ["basket", "etf", "status", "reason", "signals", "average_etf_return", "etf_win_rate", "average_constituent_equal_weight_return", "constituent_win_rate", "available_current_constituents", "constituent_method"])
-    write_csv(output / "signal_events.csv", events, ["basket", "etf", "signal_date", "entry_date", "exit_date", "holding_sessions", "etf_return", "constituent_equal_weight_return", "constituent_count", "signal_breadth", "signal_relative_strength_21d", "signal_relative_volume", "constituent_method"])
-    write_csv(output / "daily_breadth_regimes.csv", breadth_rows, ["basket", "etf", "date", "etf_return_21d", "spy_return_21d", "relative_strength_21d", "etf_relative_volume", "constituent_breadth_21d", "available_constituents", "signal_active", "signal_start", "constituent_method"])
+    write_csv(output / "signal_events.csv", events, ["basket", "etf", "signal_date", "entry_date", "exit_date", "holding_sessions", "lookback_sessions", "etf_return", "constituent_equal_weight_return", "constituent_count", "signal_breadth", "signal_relative_strength_21d", "signal_relative_volume", "constituent_method"])
+    write_csv(output / "daily_breadth_regimes.csv", breadth_rows, ["basket", "etf", "date", "lookback_sessions", "etf_return_21d", "spy_return_21d", "relative_strength_21d", "etf_relative_volume", "constituent_breadth_21d", "available_constituents", "signal_active", "signal_start", "constituent_method"])
     write_csv(output / "constituents_at_signal_entries.csv", constituents_at_entry, ["basket", "signal_date", "entry_date", "exit_date", "ticker", "weight", "return", "weight_method"])
     print(json.dumps({"output": str(output), "summary": str(output / "strategy_summary.csv"), "events": str(output / "signal_events.csv"), "regimes": str(output / "daily_breadth_regimes.csv"), "constituents": str(output / "constituents_at_signal_entries.csv"), "limitations": "Static current constituent lists are a proxy except when separately replaced by dated issuer holdings. DRAM launched in 2026 and is unavailable in a 2010-2025 window. This is an event study, not a tradable strategy or investment advice."}, indent=2))
 

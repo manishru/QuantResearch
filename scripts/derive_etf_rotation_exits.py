@@ -6,7 +6,8 @@ from pathlib import Path
 from statistics import fmean
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--events',type=Path,required=True);p.add_argument('--raw-dir',type=Path,required=True);p.add_argument('--drawdown',type=float,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--min-relative-volume',type=float,default=1.0);a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--events',type=Path,required=True);p.add_argument('--raw-dir',type=Path,required=True);p.add_argument('--drawdown',type=float,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--min-relative-volume',type=float,default=1.0);p.add_argument('--lookback-sessions',type=int,default=21);a=p.parse_args()
+ if a.lookback_sessions<2: p.error('--lookback-sessions must be at least 2')
  with a.events.open(newline='',encoding='utf-8') as f: events=list(csv.DictReader(f))
  def load(symbol):
   files=sorted(a.raw_dir.glob(symbol.replace('.','_')+'_*.json'))
@@ -20,12 +21,12 @@ def main():
   start=by[e['entry_date']]; entry=float(data[start]['adjusted_close']); peak=entry; exit_i=len(data)-1; reason='end_of_data'
   for i in range(start+1,len(data)):
    peak=max(peak,float(data[i]['adjusted_close']))
-   if i<21 or data[i]['date'] not in spy or data[i-21]['date'] not in spy: continue
-   rel=float(data[i]['adjusted_close'])/float(data[i-21]['adjusted_close'])-float(spy[data[i]['date']]['adjusted_close'])/float(spy[data[i-21]['date']]['adjusted_close'])
-   vols=[float(x['volume']) for x in data[i-21:i] if float(x['volume'])>0]; rv=float(data[i]['volume'])/fmean(vols) if vols else 0
+   if i<a.lookback_sessions or data[i]['date'] not in spy or data[i-a.lookback_sessions]['date'] not in spy: continue
+   rel=float(data[i]['adjusted_close'])/float(data[i-a.lookback_sessions]['adjusted_close'])-float(spy[data[i]['date']]['adjusted_close'])/float(spy[data[i-a.lookback_sessions]['date']]['adjusted_close'])
+   vols=[float(x['volume']) for x in data[i-a.lookback_sessions:i] if float(x['volume'])>0]; rv=float(data[i]['volume'])/fmean(vols) if vols else 0
    dd=float(data[i]['adjusted_close'])/peak-1
    if rel<0 and rv>=a.min_relative_volume and dd<=-a.drawdown: exit_i=i;reason='rotation_exit';break
-  exit_=float(data[exit_i]['adjusted_close']);out.append({**e,'exit_date':data[exit_i]['date'],'etf_return':exit_/entry-1,'exit_reason':reason,'exit_drawdown_from_peak':exit_/peak-1,'exit_relative_volume':rv if 'rv' in locals() else '', 'rotation_drawdown_threshold':a.drawdown})
+  exit_=float(data[exit_i]['adjusted_close']);out.append({**e,'exit_date':data[exit_i]['date'],'etf_return':exit_/entry-1,'exit_reason':reason,'exit_drawdown_from_peak':exit_/peak-1,'exit_relative_volume':rv if 'rv' in locals() else '', 'rotation_drawdown_threshold':a.drawdown,'rotation_lookback_sessions':a.lookback_sessions})
  a.output.parent.mkdir(parents=True,exist_ok=True)
  with a.output.open('w',newline='',encoding='utf-8') as f:
   w=csv.DictWriter(f,fieldnames=list(out[0]));w.writeheader();w.writerows(out)
