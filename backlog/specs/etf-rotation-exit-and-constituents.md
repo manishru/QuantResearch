@@ -70,3 +70,16 @@ constituents.
   be labelled a static-weight proxy.
 - Candidate exit threshold grid: 0%, -2%, -4%, -6%, -8%, -10% from entry,
   with negative 21-session relative strength and relative volume >= 1.
+
+### Historical stress-test record — 1996 to 2009
+
+Run on 2026-07-18 using the frozen rule: 10% ETF drawdown from post-entry
+peak, negative 21-session ETF relative strength versus SPY, ETF relative
+volume at least 1, then top-1 constituent with 20-day SMA above 50-day SMA
+and stock relative volume at least 1. Result: 696 static-constituent-proxy
+trades; 11.88% mean individual-trade return and 50.57% win rate.
+
+The rule was not resilient through every regime: 2001 averaged -5.90% and
+2008 averaged -8.57% with a 17.4% win rate. It recovered strongly in 2009
+(+23.66% average). This reinforces that it is an event study and needs risk
+controls; do not treat it as an all-weather or live-trading strategy.
