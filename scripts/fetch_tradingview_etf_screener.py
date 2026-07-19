@@ -21,6 +21,7 @@ DEFAULT_COLUMNS = [
     'nav_total_return.3Y', 'etf_holdings_count', 'expense_ratio',
     'asset_class.tr', 'focus.tr',
 ]
+ASSET_CLASS_IDS = {'equity': 'c05f85d35d1cd0be6ebb2af4be16e06a'}
 
 
 def scanner_filter(aum_min: float | None, aum_max: float | None, index: str | None, asset_class: str | None, country: str | None, management_style: str | None) -> list[dict]:
@@ -33,6 +34,14 @@ def scanner_filter(aum_min: float | None, aum_max: float | None, index: str | No
         filters.append({'left': 'aum', 'operation': 'less', 'right': aum_max})
     if index:
         filters.append({'left': 'index', 'operation': 'equal', 'right': index})
+    if asset_class:
+        value = ASSET_CLASS_IDS.get(asset_class.lower(), asset_class)
+        filters.append({'left': 'asset_class', 'operation': 'in_range', 'right': [value]})
+    if management_style:
+        style = management_style.lower()
+        if style not in {'active', 'passive'}:
+            raise ValueError('--management-style must be active or passive')
+        filters.append({'left': 'actively_managed', 'operation': 'in_range', 'right': ['1' if style == 'active' else '0']})
     return filters
 
 
@@ -93,8 +102,6 @@ def main() -> None:
     if args.columns_file:
         requested += [line.strip() for line in args.columns_file.read_text().splitlines() if line.strip() and not line.lstrip().startswith('#')]
     columns = DEFAULT_COLUMNS + [column for column in requested if column not in DEFAULT_COLUMNS]
-    if args.management_style and 'actively_managed' not in columns:
-        columns.append('actively_managed')
     filters = scanner_filter(args.aum_min, args.aum_max, args.index, args.asset_class, args.country, args.management_style)
     records: list[dict] = []; total_count = None
     for start in range(0, args.max_rows, args.page_size):
@@ -104,17 +111,8 @@ def main() -> None:
             values = item.get('d', []); first = values[0] if values and isinstance(values[0], dict) else {}
             row = {'tv_symbol': item.get('s', ''), 'ticker': first.get('name') or item.get('s', '').split(':')[-1], 'exchange': first.get('exchange', '')}
             row.update({column: values[index] if index < len(values) else None for index, column in enumerate(columns)})
-            if args.asset_class and str(row.get('asset_class.tr', '')).lower() != args.asset_class.lower():
-                continue
             if args.country and args.country.upper() == 'US' and row['exchange'].upper() not in {'AMEX', 'ARCA', 'BATS', 'CBOE', 'IEX', 'NASDAQ', 'NYSE'}:
                 continue
-            if args.management_style:
-                style = args.management_style.lower()
-                if style not in {'active', 'passive'}:
-                    parser.error('--management-style must be active or passive')
-                active = str(row.get('actively_managed', '')).lower() in {'true', '1', 'active', 'yes'}
-                if (style == 'active' and not active) or (style == 'passive' and active):
-                    continue
             records.append(row)
         if not page or len(page) < args.page_size or (total_count is not None and start + args.page_size >= total_count):
             break
@@ -123,7 +121,7 @@ def main() -> None:
     fields = ['tv_symbol', 'ticker', 'exchange', *columns]
     with (args.output / 'tradingview_etf_snapshot.csv').open('w', newline='', encoding='utf-8') as handle:
         writer = csv.DictWriter(handle, fieldnames=fields); writer.writeheader(); writer.writerows(records)
-    metadata = {'endpoint': 'https://scanner.tradingview.com/america/scan', 'rows': len(records), 'reported_total_count': total_count, 'server_filters': filters, 'local_filters': {'asset_class': args.asset_class, 'country': args.country, 'management_style': args.management_style}, 'columns': columns, 'limitation': 'TradingView scanner endpoint is undocumented; fields and filter values may change.'}
+    metadata = {'endpoint': 'https://scanner.tradingview.com/america/scan', 'rows': len(records), 'reported_total_count': total_count, 'server_filters': filters, 'local_filters': {'country': args.country}, 'columns': columns, 'limitation': 'TradingView scanner endpoint is undocumented; fields and filter values may change.'}
     (args.output / 'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(json.dumps(metadata, indent=2))
 
