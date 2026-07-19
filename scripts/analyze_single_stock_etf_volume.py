@@ -90,10 +90,15 @@ def main() -> None:
         symbol = symbol.upper()
         try:
             rows = fetch(symbol, token, args.as_of)
-            for window in windows:
-                report.append(summarize(symbol, rows, window))
         except Exception as error:
             errors[symbol] = str(error)
+            continue
+        for window in windows:
+            try:
+                report.append(summarize(symbol, rows, window))
+            except ValueError as error:
+                # Keep shorter, valid windows for recently launched ETFs.
+                errors[f"{symbol}:{window}"] = str(error)
     fields = ["ticker", "latest_date", "window_sessions", "price_return", "recent_avg_share_volume", "prior_avg_share_volume", "share_volume_change", "recent_avg_dollar_volume", "prior_avg_dollar_volume", "dollar_volume_change"]
     with (args.output / "volume_trend.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
