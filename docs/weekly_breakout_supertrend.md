@@ -56,3 +56,22 @@ PYTHONPATH=src .venv/bin/python scripts/backtest_weekly_breakout_supertrend.py \
 `comparison.csv` ranks configurations by XIRR. Each matching detailed file is
 under `trades/`, with signal, entry, exit, adjusted price, return, and exit
 reason for every lot.
+
+## Current rotation research screen
+
+After the ETF breadth study has been refreshed through the most recent
+completed market session, create a read-only constituent ranking with:
+
+```zsh
+PYTHONPATH=src .venv/bin/python scripts/screen_latest_etf_rotation_constituents.py \
+  --as-of 2026-07-17 \
+  --regimes reports/all_major_indexes_momentum_2010_2026/daily_breadth_regimes.csv \
+  --top 3 \
+  --min-relative-volume 1.0 \
+  --output reports/live_rotation_screen_2026-07-17
+```
+
+This requires a basket whose regime *started* on the completed session. It
+then ranks current point-in-time S&P 500 constituents by 20-day/50-day trend
+spread, requiring relative volume at least one. It does not place orders and
+is research output only.
