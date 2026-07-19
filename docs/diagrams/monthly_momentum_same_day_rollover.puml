@@ -1,0 +1,43 @@
+@startuml
+title Monthly Momentum — Same-Day 12-Cycle Rollover
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #EAF2F8
+  BorderColor #17365D
+  DiamondBackgroundColor #FFF2CC
+  DiamondBorderColor #BF9000
+  FontColor #17365D
+}
+
+start
+:Load adjusted daily OHLCV;
+:Load point-in-time index membership;
+:Apply 60-day membership rule\nand approved spin-off exceptions;
+:Calculate declared momentum returns\nand 21-session volatility;
+:On the configured monthly session,\nrank only eligible members;
+:Select top N and buy at session open;
+
+if (Stop loss before cycle 12?) then (yes)
+  :Sell using conservative stop/gap rule;
+  :Calculate net realized tax reserve;
+  :Spread after-tax proceeds over\nremaining scheduled monthly cycles;
+else (no)
+  :At the 12th subsequent monthly session,\nsell mature tranche at the open;
+  :Calculate net realized tax reserve;
+  :Make after-tax proceeds available\nimmediately on the same session;
+endif
+
+:Add scheduled early-exit installment;
+:Buy the new selected stock(s)\nat the same session open;
+:Persist trades, cash ledger,\nconfiguration metrics, ROI, and XIRR;
+stop
+
+note right
+No brokerage-settlement delay is modeled.
+Point-in-time membership is applied at
+both signal and execution.
+The +100%/+60% stepwise profit trailing
+rule is disabled for this experiment.
+end note
+@enduml

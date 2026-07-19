@@ -1,3 +1,19 @@
+Metadata-Version: 2.4
+Name: quantresearch
+Version: 0.1.0
+Summary: Reproducible quantitative research infrastructure and pipelines.
+Author: Manish Garg
+License: Proprietary
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: ruff>=0.9; extra == "dev"
+Provides-Extra: phase1
+Requires-Dist: duckdb>=1.2; extra == "phase1"
+Requires-Dist: polars>=1.20; extra == "phase1"
+Requires-Dist: pyarrow>=19; extra == "phase1"
+
 # QuantResearch
 
 A modular quantitative research platform for validated market data, feature

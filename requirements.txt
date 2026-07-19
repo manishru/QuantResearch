@@ -1,0 +1,10 @@
+# Install the project and Phase 1 data dependencies:
+#   python -m pip install -e ".[phase1]"
+#
+# Development tools:
+#   python -m pip install -e ".[dev,phase1]"
+
+duckdb>=1.2
+polars>=1.20
+pyarrow>=19
+
