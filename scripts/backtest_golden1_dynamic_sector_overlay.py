@@ -33,9 +33,12 @@ def xirr(flows):
   else:lo,a=m,c
  return (lo+hi)/2
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--trades',type=Path,required=True);p.add_argument('--raw-dir',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--project-root',type=Path,default=Path.cwd());p.add_argument('--correlation-sessions',type=int,default=63);p.add_argument('--rotation-lookback-sessions',type=int,default=21);p.add_argument('--drawdown',type=float,default=.10);p.add_argument('--min-relative-volume',type=float,default=1);p.add_argument('--require-stock-confirmation',action='store_true');p.add_argument('--stock-drawdown',type=float,default=.20);p.add_argument('--stock-min-relative-volume',type=float,default=1.5);a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--trades',type=Path,required=True);p.add_argument('--raw-dir',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--project-root',type=Path,default=Path.cwd());p.add_argument('--correlation-sessions',type=int,default=63);p.add_argument('--rotation-lookback-sessions',type=int,default=21);p.add_argument('--drawdown',type=float,default=.10);p.add_argument('--min-relative-volume',type=float,default=1);p.add_argument('--require-stock-confirmation',action='store_true');p.add_argument('--stock-drawdown',type=float,default=.20);p.add_argument('--stock-min-relative-volume',type=float,default=1.5);p.add_argument('--min-consecutive-ticker-entries',type=int,default=1);a=p.parse_args()
  if a.correlation_sessions<20 or a.rotation_lookback_sessions<2:p.error('invalid lookback')
  with a.trades.open(newline='') as f:base=list(csv.DictReader(f))
+ base.sort(key=lambda r:r['execution_date']);runs={};previous={}
+ for r in base:
+  entry=date.fromisoformat(r['execution_date']);ticker=r['ticker'];prior=previous.get(ticker);runs[(ticker,entry.isoformat())]=runs.get((ticker,prior.isoformat()),0)+1 if prior and (entry.year-prior.year)*12+entry.month-prior.month==1 else 1;previous[ticker]=entry
  raw=a.raw_dir.resolve();etf={s:load(raw,s) for s in ETFS};spy={r['date']:r for r in load(raw,'SPY.US')};idx={s:{r['date']:i for i,r in enumerate(v)} for s,v in etf.items()}
  symbols=sorted({r['ticker'] for r in base});con=duckdb.connect();root=a.project_root.resolve()
  try:
@@ -45,7 +48,7 @@ def main():
  for t,d,o,c,v in rows:stock.setdefault(t,[]).append((d,float(c),float(v)));opens[(t,d)]=float(o)
  result=[];applied=0
  for r in base:
-  row=dict(r);ticker=row['ticker'];entry=date.fromisoformat(row['execution_date']);base_exit=date.fromisoformat(row['exit_date'] or row['valuation_date']);bars=stock.get(ticker,[]);hist=[(d,c) for d,c,_ in bars if d<entry];stock_dates={d:i for i,(d,_,_) in enumerate(bars)}
+  row=dict(r);ticker=row['ticker'];entry=date.fromisoformat(row['execution_date']);run_length=runs[(ticker,entry.isoformat())];base_exit=date.fromisoformat(row['exit_date'] or row['valuation_date']);bars=stock.get(ticker,[]);hist=[(d,c) for d,c,_ in bars if d<entry];stock_dates={d:i for i,(d,_,_) in enumerate(bars)}
   best=None
   if len(hist)>a.correlation_sessions:
    recent=hist[-(a.correlation_sessions+1):]
@@ -59,9 +62,9 @@ def main():
      if d in prev:vals.append((sr[d],dates[d]/prev[d]-1))
     c=corr([v[0] for v in vals],[v[1] for v in vals])
     if c is not None and (best is None or c>best[1]):best=(symbol,c)
-  row.update({'exit_date':base_exit.isoformat(), 'dynamic_sector_etf':best[0] if best else '', 'mapping_correlation':best[1] if best else '', 'overlay_applied':False,'base_exit_date':base_exit.isoformat(),'base_exit_reason':row['exit_reason'],'overlay_signal_date':''})
+  row.update({'exit_date':base_exit.isoformat(), 'dynamic_sector_etf':best[0] if best else '', 'mapping_correlation':best[1] if best else '', 'consecutive_ticker_entries':run_length,'overlay_applied':False,'base_exit_date':base_exit.isoformat(),'base_exit_reason':row['exit_reason'],'overlay_signal_date':''})
   chosen=None
-  if best and entry.isoformat() in idx[best[0]]:
+  if best and run_length>=a.min_consecutive_ticker_entries and entry.isoformat() in idx[best[0]]:
    data=etf[best[0]];start=idx[best[0]][entry.isoformat()];peak=float(data[start]['adjusted_close'])
    for i in range(start+1,len(data)):
     d=date.fromisoformat(data[i]['date'])
