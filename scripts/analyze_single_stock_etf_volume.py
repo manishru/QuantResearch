@@ -18,7 +18,10 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 
-DEFAULT_SYMBOLS = ("SNXX", "SNDQ", "MUD", "MUZ", "000660.KS", "005930.KS")
+# Matched US-listed long/inverse products where available.  Samsung Electronics
+# does not yet have a confirmed US-listed ETF ticker in the TradingView universe
+# used by this project, so it is intentionally not guessed here.
+DEFAULT_SYMBOLS = ("SNXX", "SNDQ", "MUD", "MUZ", "SKHX", "SKHZ", "SKDD")
 
 
 def provider_symbol(symbol: str) -> str:
