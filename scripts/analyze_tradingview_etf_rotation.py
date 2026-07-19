@@ -6,6 +6,7 @@ This measures price and volume leadership, not actual institutional flows.
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import json
 import os
@@ -19,6 +20,29 @@ from urllib.request import urlopen
 
 def value(text: str | None) -> float:
     return float(text) if text not in (None, '') else 0.0
+
+
+def etf_description(row: dict[str, str]) -> str:
+    """Return TradingView's ETF name from its serialized ticker-view field."""
+    raw = row.get('ticker-view') or ''
+    try:
+        parsed = ast.literal_eval(raw)
+    except (ValueError, SyntaxError):
+        return raw
+    return str(parsed.get('name') or parsed.get('description') or raw)
+
+
+def exposure_type(description: str) -> str:
+    """Classify ETF direction conservatively from the issuer product name."""
+    name = description.lower()
+    inverse_words = (' short ', ' bear ', ' inverse ', ' -1x', ' -2x', ' -3x')
+    leverage_words = ('2x', '3x', ' leveraged', ' ultra', ' daily')
+    padded = f' {name} '
+    inverse = any(word in padded for word in inverse_words)
+    leveraged = any(word in padded for word in leverage_words)
+    if inverse:
+        return 'inverse_leveraged' if leveraged else 'inverse'
+    return 'long_leveraged' if leveraged else 'long'
 
 
 def fetch(symbol: str, start: date | None, end: date | None, token: str) -> list[dict]:
@@ -86,24 +110,45 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=True)
     cache = args.output / 'raw_eodhd'; cache.mkdir(exist_ok=True)
     token = os.environ.get(args.token_env)
-    symbols = [('SPY', 'SPY.US')] + [(row['ticker'], f"{row['ticker'].replace('.', '-')}.US") for row in selected]
+    # Keep the benchmark under a dedicated key.  SPY can also be one of the
+    # selected ETFs; using "SPY" for both caused the benchmark and ETF row to
+    # overwrite each other and could falsely report SPY.US as unavailable.
+    benchmark_key = '__benchmark_spy__'
+    symbols = [(benchmark_key, 'SPY.US')] + [
+        (row['ticker'], f"{row['ticker'].replace('.', '-')}.US") for row in selected
+    ]
     data: dict[str, list[dict]] = {}; status: dict[str, str] = {}
     for ticker, symbol in symbols:
         rows, source = load_or_fetch(symbol, cache, args.start, args.to, args.refresh, token, args.pause_seconds)
         data[ticker], status[ticker] = rows, source
-    spy = {row['date']: float(row['adjusted_close']) for row in data['SPY'] if row.get('adjusted_close') is not None}
+    spy = {
+        row['date']: float(row['adjusted_close'])
+        for row in data[benchmark_key]
+        if row.get('adjusted_close') is not None
+    }
     report: list[dict] = []
     for row in selected:
         ticker = row['ticker']; result = features(data[ticker], spy, args.lookback_sessions)
-        report.append({'ticker': ticker, 'tv_symbol': row.get('tv_symbol'), 'aum': value(row.get('aum')), 'focus': row.get('focus.tr'), 'expense_ratio': row.get('expense_ratio'), 'eodhd_symbol': f"{ticker.replace('.', '-')}.US", 'eodhd_status': status[ticker], **(result or {})})
+        description = etf_description(row)
+        report.append({'ticker': ticker, 'tv_symbol': row.get('tv_symbol'), 'etf_name': description,
+                       'exposure_type': exposure_type(description), 'aum': value(row.get('aum')),
+                       'focus': row.get('focus.tr'), 'expense_ratio': row.get('expense_ratio'),
+                       'eodhd_symbol': f"{ticker.replace('.', '-')}.US", 'eodhd_status': status[ticker],
+                       **(result or {})})
     valid = [row for row in report if row.get('return_vs_spy') is not None]
     for rank, row in enumerate(sorted(valid, key=lambda row: (row['return_vs_spy'], row['relative_volume']), reverse=True), 1):
         row['rotation_rank'] = rank
-        row['rotation_proxy'] = row['return_vs_spy'] > 0 and row['relative_volume'] >= args.min_relative_volume
-    fields = ['rotation_rank', 'rotation_proxy', 'ticker', 'tv_symbol', 'aum', 'focus', 'expense_ratio', 'eodhd_symbol', 'eodhd_status', 'date', 'close', 'return', 'spy_return', 'return_vs_spy', 'relative_volume']
+        leading = row['return_vs_spy'] > 0 and row['relative_volume'] >= args.min_relative_volume
+        row['rotation_proxy'] = row['exposure_type'] == 'long' and leading
+        # A rising inverse ETF is a bearish/risk-off proxy for its underlying
+        # exposure. It must never be included among long rotation candidates.
+        row['risk_off_proxy'] = row['exposure_type'].startswith('inverse') and leading
+    fields = ['rotation_rank', 'rotation_proxy', 'risk_off_proxy', 'ticker', 'tv_symbol', 'etf_name', 'exposure_type', 'aum', 'focus', 'expense_ratio', 'eodhd_symbol', 'eodhd_status', 'date', 'close', 'return', 'spy_return', 'return_vs_spy', 'relative_volume']
     with (args.output / 'etf_rotation.csv').open('w', newline='') as handle:
         writer = csv.DictWriter(handle, fieldnames=fields); writer.writeheader(); writer.writerows(sorted(report, key=lambda row: row.get('rotation_rank', 999999)))
-    missing = [row for row in report if not row.get('return_vs_spy')]
+    # A return relative to SPY of exactly 0.0 is valid (SPY itself has this
+    # value).  Only a missing calculation belongs in this diagnostic list.
+    missing = [row for row in report if row.get('return_vs_spy') is None]
     metadata = {'top_requested': args.top, 'etfs_selected': len(selected), 'lookback_sessions': args.lookback_sessions, 'min_relative_volume': args.min_relative_volume, 'valid_rotation_rows': len(valid), 'missing_or_unavailable': [{'ticker': row['ticker'], 'eodhd_symbol': row['eodhd_symbol'], 'status': row['eodhd_status']} for row in missing], 'limitation': 'Price/volume leadership is a rotation proxy, not confirmed institutional capital flow.'}
     (args.output / 'summary.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(json.dumps(metadata, indent=2))
