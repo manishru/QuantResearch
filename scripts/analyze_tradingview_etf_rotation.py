@@ -70,6 +70,7 @@ def main() -> None:
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--top', type=int, default=50)
     parser.add_argument('--lookback-sessions', type=int, default=21)
+    parser.add_argument('--min-relative-volume', type=float, default=1.2)
     parser.add_argument('--refresh', action='store_true', help='Download EODHD data even when a cache exists.')
     parser.add_argument('--token-env', default='EODHD_API_TOKEN')
     parser.add_argument('--pause-seconds', type=float, default=0.25)
@@ -93,12 +94,12 @@ def main() -> None:
     valid = [row for row in report if row.get('return_vs_spy') is not None]
     for rank, row in enumerate(sorted(valid, key=lambda row: (row['return_vs_spy'], row['relative_volume']), reverse=True), 1):
         row['rotation_rank'] = rank
-        row['rotation_proxy'] = row['return_vs_spy'] > 0 and row['relative_volume'] >= 1.0
+        row['rotation_proxy'] = row['return_vs_spy'] > 0 and row['relative_volume'] >= args.min_relative_volume
     fields = ['rotation_rank', 'rotation_proxy', 'ticker', 'tv_symbol', 'aum', 'focus', 'expense_ratio', 'eodhd_symbol', 'eodhd_status', 'date', 'close', 'return', 'spy_return', 'return_vs_spy', 'relative_volume']
     with (args.output / 'etf_rotation.csv').open('w', newline='') as handle:
         writer = csv.DictWriter(handle, fieldnames=fields); writer.writeheader(); writer.writerows(sorted(report, key=lambda row: row.get('rotation_rank', 999999)))
     missing = [row for row in report if not row.get('return_vs_spy')]
-    metadata = {'top_requested': args.top, 'etfs_selected': len(selected), 'lookback_sessions': args.lookback_sessions, 'valid_rotation_rows': len(valid), 'missing_or_unavailable': [{'ticker': row['ticker'], 'status': row['eodhd_status']} for row in missing], 'limitation': 'Price/volume leadership is a rotation proxy, not confirmed institutional capital flow.'}
+    metadata = {'top_requested': args.top, 'etfs_selected': len(selected), 'lookback_sessions': args.lookback_sessions, 'min_relative_volume': args.min_relative_volume, 'valid_rotation_rows': len(valid), 'missing_or_unavailable': [{'ticker': row['ticker'], 'status': row['eodhd_status']} for row in missing], 'limitation': 'Price/volume leadership is a rotation proxy, not confirmed institutional capital flow.'}
     (args.output / 'summary.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(json.dumps(metadata, indent=2))
 
