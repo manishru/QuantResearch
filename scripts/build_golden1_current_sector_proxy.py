@@ -22,8 +22,8 @@ ETF_BY_SECTOR = {
 }
 
 def fetch(ticker: str, token: str) -> dict[str, object]:
-    query = urlencode({"api_token": token, "fmt": "json"})
-    with urlopen(f"https://eodhd.com/api/fundamentals/{ticker}.US?{query}", timeout=60) as response:  # noqa: S310
+    query = urlencode({"api_token": token, "fmt": "json", "filter": "General"})
+    with urlopen(f"https://eodhd.com/api/v1.1/fundamentals/{ticker}.US?{query}", timeout=60) as response:  # noqa: S310
         value = json.loads(response.read().decode("utf-8"))
     if not isinstance(value, dict): raise ValueError("unexpected fundamentals response")
     return value
