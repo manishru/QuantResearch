@@ -22,7 +22,7 @@ DEFAULT_COLUMNS = [
 ]
 
 
-def scanner_filter(aum_min: float | None, aum_max: float | None, index: str | None) -> list[dict]:
+def scanner_filter(aum_min: float | None, aum_max: float | None, index: str | None, asset_class: str | None, country: str | None, management_style: str | None) -> list[dict]:
     filters: list[dict] = []
     if aum_min is not None and aum_max is not None:
         filters.append({'left': 'aum', 'operation': 'in_range', 'right': [aum_min, aum_max]})
@@ -32,6 +32,12 @@ def scanner_filter(aum_min: float | None, aum_max: float | None, index: str | No
         filters.append({'left': 'aum', 'operation': 'less', 'right': aum_max})
     if index:
         filters.append({'left': 'index', 'operation': 'equal', 'right': index})
+    if asset_class:
+        filters.append({'left': 'asset_class', 'operation': 'equal', 'right': asset_class})
+    if country:
+        filters.append({'left': 'country', 'operation': 'equal', 'right': country})
+    if management_style:
+        filters.append({'left': 'management_style', 'operation': 'equal', 'right': management_style})
     return filters
 
 
@@ -72,6 +78,9 @@ def main() -> None:
     parser.add_argument('--aum-min', type=float, help='Minimum AUM in USD; e.g. 1e9.')
     parser.add_argument('--aum-max', type=float, help='Maximum AUM in USD; e.g. 10e9.')
     parser.add_argument('--index', help='TradingView index field, e.g. SPX. Omit for all ETFs.')
+    parser.add_argument('--asset-class', help='TradingView asset class code, e.g. equity.')
+    parser.add_argument('--country', help='TradingView country code, e.g. US.')
+    parser.add_argument('--management-style', help='TradingView management style code, e.g. active.')
     parser.add_argument('--page-size', type=int, default=500)
     parser.add_argument('--max-rows', type=int, default=10000)
     parser.add_argument('--pause-seconds', type=float, default=0.5)
@@ -85,7 +94,7 @@ def main() -> None:
     if args.columns_file:
         requested += [line.strip() for line in args.columns_file.read_text().splitlines() if line.strip() and not line.lstrip().startswith('#')]
     columns = DEFAULT_COLUMNS + [column for column in requested if column not in DEFAULT_COLUMNS]
-    filters = scanner_filter(args.aum_min, args.aum_max, args.index)
+    filters = scanner_filter(args.aum_min, args.aum_max, args.index, args.asset_class, args.country, args.management_style)
     records: list[dict] = []; total_count = None
     for start in range(0, args.max_rows, args.page_size):
         response = fetch(payload(columns, start, args.page_size, filters), args.timeout)
