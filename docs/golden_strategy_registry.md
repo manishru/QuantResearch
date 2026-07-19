@@ -4,7 +4,29 @@ This registry ranks only research strategies with comparable, documented
 out-of-sample evidence. A Golden label is not investment advice, a guarantee,
 or an instruction to trade.
 
-## Golden 1 — ETF rotation constituent rule
+## Golden 1 — 12M > 6M > 3M momentum, 51-week hold
+
+**Status:** provisional Golden 1, recorded 2026-07-19.
+
+### Rule
+
+1. On the 26th of each month (or next available market session), select the
+   top one point-in-time S&P 500 stock satisfying `12M > 6M > 3M > 0`.
+2. Require one-month volatility at or below 15%.
+3. Invest a fixed $1,000 per monthly lot; no reinvestment and no tax model.
+4. Exit at 51 weeks or a 45% stop. End-period lots are marked to market.
+
+### Evidence
+
+| Evaluation | XIRR | ROI | Win rate | Lots | Qualification |
+|---|---:|---:|---:|---:|---|
+| Train: 2010–2024 | 15.52% | 25.69% | 63.33% | 180 | 15 lots marked open at the end |
+| Forward: 2025–2026-07-17 | 37.51% | 24.69% | 55.56% | 18 | 12 lots marked open at the end |
+
+The forward period is only about 18 months and contains substantial unrealized
+exposure, so this is a provisional ranking rather than a durability claim.
+
+## Golden 2 — ETF rotation constituent rule
 
 **Status:** frozen for forward monitoring on 2026-07-19.
 
@@ -20,7 +42,7 @@ or an instruction to trade.
    negative 21-session performance relative to SPY, and ETF relative volume
    is at least 1.0. The modeled exit is the following market session's open.
 
-### Evidence used to assign Golden 1
+### Evidence used to assign Golden 2
 
 The configuration was chosen from a predeclared 10/30, 20/50, 30/100, and
 50/150 SMA comparison using the same entry/exit method.
