@@ -18,7 +18,12 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 
-DEFAULT_SYMBOLS = ("SNXX", "SNDQ", "MUD", "MUZ")
+DEFAULT_SYMBOLS = ("SNXX", "SNDQ", "MUD", "MUZ", "000660.KS", "005930.KS")
+
+
+def provider_symbol(symbol: str) -> str:
+    """Use an explicit EODHD exchange suffix, otherwise default to US."""
+    return symbol if "." in symbol else f"{symbol}.US"
 
 
 def fetch(symbol: str, token: str, as_of: date | None) -> list[dict]:
@@ -26,7 +31,7 @@ def fetch(symbol: str, token: str, as_of: date | None) -> list[dict]:
     if as_of:
         parameters["to"] = as_of.isoformat()
     request = urlencode(parameters)
-    with urlopen(f"https://eodhd.com/api/eod/{symbol}.US?{request}", timeout=60) as response:
+    with urlopen(f"https://eodhd.com/api/eod/{provider_symbol(symbol)}?{request}", timeout=60) as response:
         payload = json.loads(response.read())
     if not isinstance(payload, list):
         raise RuntimeError(str(payload))
@@ -79,7 +84,7 @@ def main() -> None:
     report: list[dict[str, object]] = []
     errors: dict[str, str] = {}
     for symbol in symbols:
-        symbol = symbol.upper().removesuffix(".US")
+        symbol = symbol.upper()
         try:
             rows = fetch(symbol, token, args.as_of)
             for window in windows:
