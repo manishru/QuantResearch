@@ -20,8 +20,8 @@ def main() -> None:
     p.add_argument("--lookback-sessions", type=int, action="append", default=None)
     p.add_argument("--train-end", default="2020-12-31")
     p.add_argument("--test-start", default="2023-01-01")
-    p.add_argument("--forward-start", default="2026-04-01",
-                   help="Recent forward slice; includes DRAM only once its data exists")
+    p.add_argument("--forward-start",
+                   help="Optional additional recent slice, for example 2026-04-01 for DRAM")
     p.add_argument("--drawdown", type=float, default=.10)
     p.add_argument("--min-relative-volume", type=float, default=1.0)
     p.add_argument("--refresh", action="store_true")
@@ -39,7 +39,10 @@ def main() -> None:
         run(cmd)
         exits=out/f"rotation_exit_{horizon}d.csv"
         run([sys.executable,str(root/'scripts/derive_etf_rotation_exits.py'),'--events',str(event_dir/'signal_events.csv'),'--raw-dir',str(event_dir/'raw_eodhd'),'--drawdown',str(a.drawdown),'--lookback-sessions',str(horizon),'--min-relative-volume',str(a.min_relative_volume),'--output',str(exits)])
-        for period,start,end in [('train',a.start,a.train_end),('test',a.test_start,a.to),('forward',a.forward_start,a.to)]:
+        periods = [('train', a.start, a.train_end), ('forward', a.test_start, a.to)]
+        if a.forward_start and a.forward_start != a.test_start:
+            periods.append(('recent_forward', a.forward_start, a.to))
+        for period,start,end in periods:
             selected=out/f"{period}_{horizon}d"
             run([sys.executable,str(root/'scripts/backtest_constituent_sma_ranking.py'),'--events',str(exits),'--from-signal',start,'--to-signal',end,'--sma-pair','20:50','--top-n','1','--min-relative-volume',str(a.min_relative_volume),'--output',str(selected)])
             with (selected/'sma_candidate_summary.csv').open(newline='',encoding='utf-8') as f:
