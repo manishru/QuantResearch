@@ -285,6 +285,34 @@ The high semiconductor XIRRs arise from repeated short-duration monthly cash
 flows. They are sensitive to execution/cost assumptions and must not be read
 as a forecast.
 
+## 17. Source-Control and Recovery Backup
+
+Completed on 2026-07-18:
+
+- Created and pushed private repository:
+  `https://github.com/manishru/QuantResearch`
+- Default branch: `main`.
+- Initial organized source-control commit: `d8adcc7` — `Organize QuantResearch
+  research platform and runbooks`.
+- Repository tracks source, tests, scripts, specifications, AltTab histories,
+  and documentation. `.gitignore` excludes secrets, virtual environments,
+  generated reports, raw/validated data, Parquet, DuckDB, logs, and CSV output.
+- Recovery instructions: `docs/backup_and_recovery.md`.
+- Archive manifest utility: `scripts/create_research_backup_manifest.py`.
+
+Required recurring backup procedure:
+
+```zsh
+cd ~/QuantResearch
+PYTHONPATH=src .venv/bin/python scripts/create_research_backup_manifest.py \
+  --output reports/backup_manifest_latest.csv
+git add -A && git commit -m "Update research code and runbooks" && git push
+```
+
+Copy `data/`, `reports/`, and `reports/backup_manifest_latest.csv` to an
+encrypted external SSD or private cloud backup. Normal GitHub Git storage is
+not the backup location for this large data archive (about 104 GB of reports).
+
 ## Pending
 
 ### Conversation Summary
