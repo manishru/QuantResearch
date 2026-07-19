@@ -97,10 +97,14 @@ def main() -> None:
     parser.add_argument('--timeout', type=int, default=30)
     parser.add_argument('--max-rows', type=int, default=10000)
     parser.add_argument('--column', action='append', dest='columns', help='Add a TradingView field; repeatable.')
+    parser.add_argument('--columns-file', type=Path, help='One TradingView field name per line; blank lines and # comments are ignored.')
     args = parser.parse_args()
     if args.page_size < 1 or args.max_rows < 1:
         parser.error('page-size and max-rows must be positive')
-    columns = DEFAULT_COLUMNS + [column for column in (args.columns or []) if column not in DEFAULT_COLUMNS]
+    requested = list(args.columns or [])
+    if args.columns_file:
+        requested += [line.strip() for line in args.columns_file.read_text().splitlines() if line.strip() and not line.lstrip().startswith('#')]
+    columns = DEFAULT_COLUMNS + [column for column in requested if column not in DEFAULT_COLUMNS]
     members = sp500_members(args.membership_file, args.as_of)
     records: list[dict] = []
     total_count = None
