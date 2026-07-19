@@ -21,8 +21,13 @@ def value(text: str | None) -> float:
     return float(text) if text not in (None, '') else 0.0
 
 
-def fetch(symbol: str, start: date, end: date, token: str) -> list[dict]:
-    query = urlencode({'from': start.isoformat(), 'to': end.isoformat(), 'api_token': token, 'fmt': 'json'})
+def fetch(symbol: str, start: date | None, end: date | None, token: str) -> list[dict]:
+    parameters = {'api_token': token, 'fmt': 'json'}
+    if start:
+        parameters['from'] = start.isoformat()
+    if end:
+        parameters['to'] = end.isoformat()
+    query = urlencode(parameters)
     with urlopen(f'https://eodhd.com/api/eod/{symbol}?{query}', timeout=60) as response:
         data = json.loads(response.read())
     if isinstance(data, dict):
@@ -30,8 +35,8 @@ def fetch(symbol: str, start: date, end: date, token: str) -> list[dict]:
     return data
 
 
-def load_or_fetch(symbol: str, cache: Path, start: date, end: date, refresh: bool, token: str | None, pause: float) -> tuple[list[dict], str]:
-    file = cache / f'{symbol.replace(".", "_")}_{start}_{end}.json'
+def load_or_fetch(symbol: str, cache: Path, start: date | None, end: date | None, refresh: bool, token: str | None, pause: float) -> tuple[list[dict], str]:
+    file = cache / f'{symbol.replace(".", "_")}_{start or "all"}_{end or "latest"}.json'
     if file.exists() and not refresh:
         return json.loads(file.read_text()), 'cache'
     if not token:
@@ -65,8 +70,8 @@ def features(rows: list[dict], spy: dict[str, float], lookback: int) -> dict | N
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--snapshot', type=Path, required=True, help='TradingView ETF snapshot CSV.')
-    parser.add_argument('--from', dest='start', type=date.fromisoformat, required=True)
-    parser.add_argument('--to', type=date.fromisoformat, required=True)
+    parser.add_argument('--from', dest='start', type=date.fromisoformat, help='Optional; omit to request all available EODHD history.')
+    parser.add_argument('--to', type=date.fromisoformat, default=date.today(), help='Optional; defaults to today.')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--top', type=int, default=50)
     parser.add_argument('--lookback-sessions', type=int, default=21)
