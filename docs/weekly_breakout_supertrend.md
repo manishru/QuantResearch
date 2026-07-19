@@ -75,3 +75,21 @@ This requires a basket whose regime *started* on the completed session. It
 then ranks current point-in-time S&P 500 constituents by 20-day/50-day trend
 spread, requiring relative volume at least one. It does not place orders and
 is research output only.
+
+To record a research candidate's actual entry-session raw open and monitor the
+tested 10% ETF rotation exit after the market closes, first refresh the local
+S&P 500 data for that session, then run:
+
+```zsh
+PYTHONPATH=src .venv/bin/python scripts/monitor_rotation_forward_positions.py \
+  --candidates reports/live_rotation_screen_2026-07-17/research_candidates.csv \
+  --entry-date 2026-07-20 \
+  --as-of 2026-07-20 \
+  --rotation-drawdown 0.10 \
+  --min-relative-volume 1.0 \
+  --refresh-etfs \
+  --output reports/xlf_rotation_forward_2026-07-20
+```
+
+Run it again after each completed session with a new `--as-of` date. It writes
+`positions.csv` (latest state) and `monitor_history.csv` (dated snapshots).
