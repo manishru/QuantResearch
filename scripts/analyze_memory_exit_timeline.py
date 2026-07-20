@@ -103,7 +103,8 @@ def main() -> None:
                 row[f"{name}_{field}"] = values.get(field, "")
             now = bool(values.get("signal", False))
             if now and not previous[name]:
-                events.append({"signal_date": observed, "signal": name, **values,
+                event_values = {key: value for key, value in values.items() if key != "signal"}
+                events.append({"signal_date": observed, "signal": name, **event_values,
                                "execution_assumption": "following_session_open"})
             previous[name] = now
         daily.append(row)
