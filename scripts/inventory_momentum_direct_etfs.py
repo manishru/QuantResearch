@@ -41,6 +41,7 @@ def company_aliases(snapshot: Path | None) -> dict[str, list[str]]:
         return {}
     aliases: dict[str, list[str]] = {}
     suffixes = re.compile(r"\b(incorporated|corporation|corp|company|co|limited|ltd|plc|holdings|technologies|technology|class [a-z]+)\b", re.I)
+    generic_words = {"FIRST", "GLOBAL", "UNITED", "AMERICAN", "THE", "GROUP", "FINANCIAL"}
     for row in read_csv(snapshot):
         ticker = row.get("ticker", "")
         text = description(row)
@@ -48,9 +49,13 @@ def company_aliases(snapshot: Path | None) -> dict[str, list[str]]:
         cleaned = suffixes.sub(" ", cleaned)
         words = [word for word in cleaned.split() if len(word) >= 4]
         if words:
-            # One distinctive company-name token is enough for a supplemental
-            # match; the ETF must still explicitly state long/bull/short/bear.
-            aliases[ticker] = [words[0].upper()]
+            phrase = " ".join(words).upper()
+            terms = [phrase]
+            # A one-word alias is allowed only when it is distinctive.  This
+            # avoids false matches such as First Solar -> First Trust funds.
+            if len(words) == 1 and words[0].upper() not in generic_words:
+                terms.append(words[0].upper())
+            aliases[ticker] = terms
     return aliases
 
 
