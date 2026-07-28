@@ -69,8 +69,8 @@ local and are deliberately not committed.
 
 ## Preserved comparison baseline
 
-The prior sector-cooldown comparison is retained locally at
-`reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/`. Its best tested
+The prior sector-cooldown comparison is version-controlled at
+`reference_backtests/golden_5m3m_sector_cooldown_2016_2026/`. Its best tested
 threshold was **four concurrent open lots sharing the same mapped ETF**:
 
 | Metric | Preserved result |

@@ -1,0 +1,14 @@
+{
+  "minimum_sector_open_lots": 5,
+  "trade_count": 126,
+  "cash_months": 0,
+  "total_contributions": 126000.0,
+  "idle_cash_contributions": 0.0,
+  "net_proceeds": 201143.96291119035,
+  "net_profit": 75143.96291119035,
+  "roi": 0.5963806580253201,
+  "xirr": 0.752132204603656,
+  "early_etf_exits": 62,
+  "trades": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_5/trades.csv",
+  "decisions": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_5/monthly_decisions.csv"
+}
