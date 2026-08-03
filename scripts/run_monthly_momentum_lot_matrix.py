@@ -558,6 +558,17 @@ def main() -> None:
             ],
         ).fetchall()
         columns = [item[0] for item in con.description]
+        candidate_rows = con.execute(
+            """
+            SELECT rule_name, nominal_day, target, signal_date, execution_date,
+                   ticker, rank, candidate_count, ranking_return, ret42, ret63,
+                   ret84, ret105, ret126, ret147, ret168, ret189, ret252,
+                   volatility_1m, entry_price
+            FROM rankings
+            ORDER BY rule_name, nominal_day, execution_date, rank
+            """
+        ).fetchall()
+        candidate_columns = [item[0] for item in con.description]
     finally:
         con.close()
 
@@ -646,6 +657,14 @@ def main() -> None:
     trade_headers = list(trades[0])
     summary_headers = list(summaries[0])
     _write_csv(output / "all_trades.csv", trade_headers, trades)
+    # Preserve the completed-session top-five ranking before top-N portfolio
+    # selection.  Overlay research can then skip a blocked rank-1 candidate
+    # without reconstructing rankings from future data.
+    _write_csv(
+        output / "candidate_rankings.csv",
+        candidate_columns,
+        [dict(zip(candidate_columns, values, strict=True)) for values in candidate_rows],
+    )
     best_configuration = summaries[0]
     best_trades = [
         trade

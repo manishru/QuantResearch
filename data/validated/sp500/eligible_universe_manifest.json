@@ -1,0 +1,17 @@
+{
+  "index_id": "SP500",
+  "status": "ready_with_operator_approved_exclusions",
+  "optimization_allowed": true,
+  "gross_minimum_coverage": 0.8726899383983573,
+  "eligible_minimum_coverage": 1.0,
+  "approved_exclusion_intervals": 85,
+  "approved_mappings": 6,
+  "rejected_mappings": 55,
+  "membership_source_sha256": "bc9c2aaed27e70406a247cd3f75513e786b0f173c70c3e05c1e243bf25498787",
+  "mapping_decisions_sha256": "d5003a2e64dcba3f86375554d75a73ea6fcfc943e57c6378e4952970c373be94",
+  "exclusion_decisions_sha256": "1d1400cd3db2a7fb98766467d3196d7d1efbbaccab289a26ec46824704183c88",
+  "eligible_history_version": "2762aff3efa8c946c0c6d343f0ccc37860285e5376fd20270d3529e0fc1ccab2",
+  "eligible_intervals_sha256": "73507a5d67e4422f79c85d0c22f86b4a71aaa3caefbbedbaef3e43b8b90e17fb",
+  "eligible_intervals": "data/validated/sp500/eligible_membership_intervals.csv",
+  "fold_coverage": "data/validated/sp500/operator_fold_coverage.csv"
+}

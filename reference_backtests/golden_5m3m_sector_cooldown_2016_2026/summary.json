@@ -1,0 +1,113 @@
+{
+  "thresholds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "comparison": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/comparison.csv",
+  "results": [
+    {
+      "minimum_sector_open_lots": 1,
+      "trade_count": 126,
+      "cash_months": 0,
+      "total_contributions": 126000.0,
+      "idle_cash_contributions": 0.0,
+      "net_proceeds": 182940.7434927062,
+      "net_profit": 56940.74349270621,
+      "roi": 0.4519106626405256,
+      "xirr": 0.7602416597636272,
+      "early_etf_exits": 77,
+      "trades": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_1/trades.csv",
+      "decisions": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_1/monthly_decisions.csv",
+      "parameters": {
+        "max_rank": 10,
+        "cooldown_months": 6,
+        "minimum_relative_volume": 1.25,
+        "drawdown": 0.1
+      }
+    },
+    {
+      "minimum_sector_open_lots": 2,
+      "trade_count": 126,
+      "cash_months": 0,
+      "total_contributions": 126000.0,
+      "idle_cash_contributions": 0.0,
+      "net_proceeds": 187544.8314570922,
+      "net_profit": 61544.831457092194,
+      "roi": 0.4884510433102556,
+      "xirr": 0.7257483668203506,
+      "early_etf_exits": 64,
+      "trades": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_2/trades.csv",
+      "decisions": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_2/monthly_decisions.csv",
+      "parameters": {
+        "max_rank": 10,
+        "cooldown_months": 6,
+        "minimum_relative_volume": 1.25,
+        "drawdown": 0.1
+      }
+    },
+    {
+      "minimum_sector_open_lots": 3,
+      "trade_count": 126,
+      "cash_months": 0,
+      "total_contributions": 126000.0,
+      "idle_cash_contributions": 0.0,
+      "net_proceeds": 190540.4550942564,
+      "net_profit": 64540.45509425641,
+      "roi": 0.5122258340814001,
+      "xirr": 0.7367213517657742,
+      "early_etf_exits": 66,
+      "trades": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_3/trades.csv",
+      "decisions": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_3/monthly_decisions.csv",
+      "parameters": {
+        "max_rank": 10,
+        "cooldown_months": 6,
+        "minimum_relative_volume": 1.25,
+        "drawdown": 0.1
+      }
+    },
+    {
+      "minimum_sector_open_lots": 4,
+      "trade_count": 126,
+      "cash_months": 0,
+      "total_contributions": 126000.0,
+      "idle_cash_contributions": 0.0,
+      "net_proceeds": 211737.59649061871,
+      "net_profit": 85737.59649061871,
+      "roi": 0.6804571150049104,
+      "xirr": 0.7122676650973936,
+      "early_etf_exits": 48,
+      "trades": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_4/trades.csv",
+      "decisions": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_4/monthly_decisions.csv",
+      "parameters": {
+        "max_rank": 10,
+        "cooldown_months": 6,
+        "minimum_relative_volume": 1.25,
+        "drawdown": 0.1
+      }
+    },
+    {
+      "minimum_sector_open_lots": 5,
+      "trade_count": 126,
+      "cash_months": 0,
+      "total_contributions": 126000.0,
+      "idle_cash_contributions": 0.0,
+      "net_proceeds": 201143.96291119035,
+      "net_profit": 75143.96291119035,
+      "roi": 0.5963806580253201,
+      "xirr": 0.752132204603656,
+      "early_etf_exits": 62,
+      "trades": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_5/trades.csv",
+      "decisions": "reports/5m3m_etf_exit_lot_matrix_mapped_2016_2026/min_open_lots_5/monthly_decisions.csv",
+      "parameters": {
+        "max_rank": 10,
+        "cooldown_months": 6,
+        "minimum_relative_volume": 1.25,
+        "drawdown": 0.1
+      }
+    }
+  ],
+  "limitation": "Current ETF mappings are sector/theme proxies, not dated ETF holdings. Research only."
+}
