@@ -18,6 +18,7 @@ This v2 experiment corrects the earlier pooled-cash overlay. Every early-exited 
 - [B9] Provide a separately selectable volume-leader sleeve: form the normal top-N price leaders, invest only in the one with the largest relative volume when that volume meets a stricter configurable floor, and keep checking completed sessions until the source lot matures if no such ETF exists.
 - [B10] Compare the selected ETF sleeve with an equal-weight sleeve of its three largest latest-public N-PORT constituents. Constituents use a 40% daily stop or the source ETF sleeve's recorded exit date, whichever comes first.
 - [B11] Provide a cache-only daily decision report: from a specified completed risk-off date to a specified completed as-of date, rank ETF price leaders, apply the unchanged strict volume-leader selection, and publish the selected ETF's three latest-public N-PORT constituents for the next available session. A missing cache window is reported and excluded rather than fetched or backfilled.
+- [B12] Provide an operational daily runner that incrementally refreshes completed S&P 500 and ETF prices, records the latest public N-PORT coverage, runs B11 only for a supplied actual sector-exit signal, and produces a separate ranked 26th-of-month golden candidate report.
 
 ## Branches and Errors
 
@@ -28,6 +29,7 @@ This v2 experiment corrects the earlier pooled-cash overlay. Every early-exited 
 - [BR5] A top price leader below the stricter selected-volume floor does not enter; it is reconsidered on the next completed session without using future information.
 - [BR6] If fewer than three public, ticker-resolved N-PORT constituents or their daily OHLC is available, leave that ETF sleeve unchanged and report it as untestable; do not substitute current holdings.
 - [BR7] If the top-volume member of the top price leaders does not meet the strict floor, publish no entry; do not weaken the threshold based on current outcomes.
+- [BR8] A monthly ranked candidate is not a new golden entry until the existing portfolio's cash and six-month sector-cooldown state have also been checked.
 - [FM1] Missing mapping: audit and skip the candidate rather than inventing a sector.
 
 ## Non-Goals

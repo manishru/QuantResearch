@@ -14,8 +14,10 @@ Create a standalone v2 CLI rather than changing the v1 experiment. Reuse the exi
 5. Add a configurable top-volume-of-price-leaders selection mode, retain daily rechecks on no selection, and compare it with the equal-weight top-three rotation using identical funding.
 6. Add a post-process constituent-sleeve comparator that preserves the selected ETF sleeve dates and replaces only auditable N-PORT-covered sleeves with three equal stock positions.
 7. Add a cache-only as-of decision report which applies the frozen ETF-leader rule and publishes next-session top-three N-PORT constituent candidates without any API call or future data.
+8. Add a daily operational runner that refreshes completed price inputs incrementally, reports N-PORT publication coverage without daily N-PORT backfill, and separates actual rotation exits from 26th-of-month ranked golden candidates.
 
 ## Tests
 
 Use `unittest`: daily rechecking chooses a leader after an initial no-leader day; maturity forces an exit; triggering ETF is excluded.
 Also verify that the as-of report does not relax the strict selected-volume floor when no current ETF qualifies.
+Verify that the operational runner does not create a rotation decision without an actual sector-exit signal and invokes the monthly candidate engine only on or after the nominal day.
