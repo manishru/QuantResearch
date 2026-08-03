@@ -474,7 +474,11 @@ def main() -> None:
                         for request, symbol_rows, fetched_at in successful:
                             provider_symbol, constituent_symbol, window_start, window_end, source_interval, allowed_sessions = request
                             if symbol_rows:
-                                connection.executemany("INSERT OR REPLACE INTO intraday_bars VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", symbol_rows)
+                                # Request windows are non-overlapping and their
+                                # successful completion is recorded in the same
+                                # transaction below.  Plain append avoids an
+                                # unscalable in-memory primary-key index.
+                                connection.executemany("INSERT INTO intraday_bars VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", symbol_rows)
                             connection.execute(
                                 "INSERT OR REPLACE INTO intraday_fetch_windows VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                                 [provider_symbol, constituent_symbol, source_interval, session_scope(allowed_sessions), window_start, window_end, fetched_at, len(symbol_rows)],
