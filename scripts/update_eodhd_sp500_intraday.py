@@ -32,7 +32,7 @@ NY = ZoneInfo("America/New_York")
 UTC = timezone.utc
 MAX_1M_DAYS = 120
 MAX_5M_DAYS = 600
-SCHEMA_SQL = """
+INTRADAY_BARS_SQL = """
 CREATE TABLE IF NOT EXISTS intraday_bars (
     constituent_symbol VARCHAR NOT NULL,
     provider_symbol VARCHAR NOT NULL,
@@ -50,9 +50,24 @@ CREATE TABLE IF NOT EXISTS intraday_bars (
     gmtoffset_seconds INTEGER,
     fetched_at_utc TIMESTAMPTZ NOT NULL,
     source_window_from_utc TIMESTAMPTZ NOT NULL,
-    source_window_to_utc TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (provider_symbol, interval, provider_timestamp)
+    source_window_to_utc TIMESTAMPTZ NOT NULL
 );
+"""
+
+VIEWS_SQL = """
+CREATE OR REPLACE VIEW intraday_pre_market AS
+SELECT * FROM intraday_bars WHERE session = 'pre_market';
+CREATE OR REPLACE VIEW intraday_regular_market AS
+SELECT * FROM intraday_bars WHERE session = 'regular';
+CREATE OR REPLACE VIEW intraday_after_hours AS
+SELECT * FROM intraday_bars WHERE session = 'after_hours';
+CREATE OR REPLACE VIEW intraday_hybrid_5m_regular_1m_extended AS
+SELECT * FROM intraday_bars
+WHERE (session = 'regular' AND interval = '5m')
+   OR (session IN ('pre_market', 'after_hours') AND interval = '1m');
+"""
+
+SCHEMA_SQL = INTRADAY_BARS_SQL + """
 
 CREATE TABLE IF NOT EXISTS intraday_fetch_runs (
     run_id VARCHAR PRIMARY KEY,
@@ -81,19 +96,7 @@ CREATE TABLE IF NOT EXISTS intraday_fetch_windows (
     rows_written BIGINT NOT NULL,
     PRIMARY KEY (provider_symbol, interval, session_scope, window_start_utc, window_end_utc)
 );
-
-CREATE OR REPLACE VIEW intraday_pre_market AS
-SELECT * FROM intraday_bars WHERE session = 'pre_market';
-CREATE OR REPLACE VIEW intraday_regular_market AS
-SELECT * FROM intraday_bars WHERE session = 'regular';
-CREATE OR REPLACE VIEW intraday_after_hours AS
-SELECT * FROM intraday_bars WHERE session = 'after_hours';
-
-CREATE OR REPLACE VIEW intraday_hybrid_5m_regular_1m_extended AS
-SELECT * FROM intraday_bars
-WHERE (session = 'regular' AND interval = '5m')
-   OR (session IN ('pre_market', 'after_hours') AND interval = '1m');
-"""
+""" + VIEWS_SQL
 
 
 def parse_utc_day(value: str, *, end: bool = False) -> datetime:
@@ -284,6 +287,40 @@ def duckdb_configuration(memory_limit: str, threads: int, temp_directory: Path) 
     }
 
 
+def intraday_bars_uses_primary_key(connection: duckdb.DuckDBPyConnection) -> bool:
+    """Detect legacy stores whose huge bar index cannot spill to disk."""
+    row = connection.execute("SELECT sql FROM duckdb_tables() WHERE table_name='intraday_bars'").fetchone()
+    return bool(row and "PRIMARY KEY" in str(row[0]).upper())
+
+
+def migrate_intraday_bars_to_append_only(connection: duckdb.DuckDBPyConnection) -> int:
+    """Preserve existing bars while dropping only the unscalable bar-table index.
+
+    Idempotency is maintained by the much smaller ``intraday_fetch_windows``
+    primary key and by non-overlapping request windows.  This migration is
+    explicit because it rewrites the local derived database.
+    """
+    prior_rows = connection.execute("SELECT COUNT(*) FROM intraday_bars").fetchone()[0]
+    connection.execute("BEGIN")
+    try:
+        connection.execute("DROP VIEW IF EXISTS intraday_pre_market")
+        connection.execute("DROP VIEW IF EXISTS intraday_regular_market")
+        connection.execute("DROP VIEW IF EXISTS intraday_after_hours")
+        connection.execute("DROP VIEW IF EXISTS intraday_hybrid_5m_regular_1m_extended")
+        connection.execute("CREATE TABLE intraday_bars_append_only AS SELECT * FROM intraday_bars")
+        copied_rows = connection.execute("SELECT COUNT(*) FROM intraday_bars_append_only").fetchone()[0]
+        if copied_rows != prior_rows:
+            raise RuntimeError(f"append-only migration count mismatch: {copied_rows} copied, expected {prior_rows}")
+        connection.execute("DROP TABLE intraday_bars")
+        connection.execute("ALTER TABLE intraday_bars_append_only RENAME TO intraday_bars")
+        connection.execute(VIEWS_SQL)
+        connection.execute("COMMIT")
+    except Exception:
+        connection.execute("ROLLBACK")
+        raise
+    return prior_rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
@@ -311,6 +348,7 @@ def main() -> None:
     parser.add_argument("--duckdb-memory-limit", default="2GB", help="Bound DuckDB working memory; larger state spills to --duckdb-temp-directory.")
     parser.add_argument("--duckdb-threads", type=int, default=1, help="DuckDB execution threads for this one-writer process.")
     parser.add_argument("--duckdb-temp-directory", type=Path, help="Disk workspace for DuckDB spill files; defaults beside --database.")
+    parser.add_argument("--migrate-to-append-only", action="store_true", help="One-time migration for a legacy intraday_bars primary-key table; preserves bars and uses completed-window records for idempotency.")
     parser.add_argument("--resume", action="store_true", help="Skip request windows already recorded or already present in this database.")
     parser.add_argument("--progress-every", type=int, default=10)
     parser.add_argument("--token-env", default="EODHD_API_TOKEN")
@@ -381,6 +419,11 @@ def main() -> None:
     connection = duckdb.connect(str(database), config=duckdb_configuration(args.duckdb_memory_limit, args.duckdb_threads, temp_directory))
     try:
         connection.execute(SCHEMA_SQL)
+        if intraday_bars_uses_primary_key(connection):
+            if not args.migrate_to_append_only:
+                parser.error("legacy intraday_bars primary key cannot scale for this backfill; rerun once with --migrate-to-append-only")
+            migrated_rows = migrate_intraday_bars_to_append_only(connection)
+            print(f"migrated intraday_bars to append-only storage; preserved_rows={migrated_rows}", flush=True)
         skipped_windows = 0
         if args.resume:
             completed = set(connection.execute(

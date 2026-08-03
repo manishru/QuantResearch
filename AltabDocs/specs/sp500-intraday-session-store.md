@@ -18,6 +18,7 @@ point-in-time date without modifying the validated daily data set.
 - A fresh historical backfill can run in deterministic, non-overlapping worker partitions, each with its own DuckDB file, and merge only after all workers finish.
 - After all writers stop, `scripts/optimize_intraday_duckdb.py` creates point/range lookup indexes, gathers statistics with `ANALYZE`, and checkpoints the database for rule queries.
 - A resumed long backfill bounds DuckDB memory, disables insertion-order preservation, and spills intermediate state to an explicit local temp directory rather than exhausting host RAM.
+- Legacy stores with a bar-table primary key support an explicit, count-validated migration to append-only bar storage. Request-window records retain idempotent resume behavior without an in-memory index over tens of millions of bars.
 
 ## Out of scope
 

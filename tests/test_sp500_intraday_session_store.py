@@ -34,6 +34,18 @@ class SessionClassificationTest(unittest.TestCase):
             with TemporaryDirectory() as temporary:
                 with self.assertRaises(ValueError):
                     MODULE.duckdb_configuration("unlimited", 1, Path(temporary))
+
+    def test_append_only_migration_preserves_bars_and_removes_primary_key(self) -> None:
+        with TemporaryDirectory() as temporary:
+            database = Path(temporary) / "intraday.duckdb"
+            connection = MODULE.duckdb.connect(str(database))
+            connection.execute(MODULE.SCHEMA_SQL.replace(MODULE.INTRADAY_BARS_SQL, MODULE.INTRADAY_BARS_SQL.replace("source_window_to_utc TIMESTAMPTZ NOT NULL\n);", "source_window_to_utc TIMESTAMPTZ NOT NULL, PRIMARY KEY(provider_symbol, interval, provider_timestamp)\n);")))
+            connection.execute("INSERT INTO intraday_bars VALUES ('ABC', 'ABC', '5m', 1, TIMESTAMPTZ '2026-01-01 00:00:00+00', TIMESTAMPTZ '2025-12-31 19:00:00-05', DATE '2025-12-31', 'after_hours', 1, 1, 1, 1, 1, 0, TIMESTAMPTZ '2026-01-01 00:00:00+00', TIMESTAMPTZ '2026-01-01 00:00:00+00', TIMESTAMPTZ '2026-01-02 00:00:00+00')")
+            self.assertTrue(MODULE.intraday_bars_uses_primary_key(connection))
+            self.assertEqual(MODULE.migrate_intraday_bars_to_append_only(connection), 1)
+            self.assertFalse(MODULE.intraday_bars_uses_primary_key(connection))
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM intraday_bars").fetchone()[0], 1)
+            connection.close()
     def test_new_york_session_boundaries(self) -> None:
         cases = {
             "2026-07-31T07:59:00+00:00": "off_session",  # 03:59 ET, deliberately outside
