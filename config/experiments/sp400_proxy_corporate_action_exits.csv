@@ -1,0 +1,11 @@
+ticker,effective_date,cash_exit_price,source,note
+BIVV,2018-03-08,105.00,Sanofi acquisition completion,All Bioverativ shares acquired for cash; point-in-time price-gap resolution.
+DWA,2016-08-22,41.00,Comcast/NBCUniversal DreamWorks acquisition completion,All DreamWorks Animation shares acquired for cash; use the announced cash consideration rather than leaving a delisted position open.
+CAA,2018-02-12,53.12,CalAtlantic final tradable close,CalAtlantic merged into Lennar for 0.885 LEN plus 0.0177 LEN.B per share. The proxy database lacks LEN.B; this conservative resolver realizes CAA at its final observed close instead of inventing a share-conversion valuation. Replace with a full LEN/LEN.B conversion ledger if those prices are added.
+LNCE,2018-03-26,50.00,Campbell acquisition completion,Snyder's-Lance acquired for $50 cash per share.
+LPNT,2018-11-16,65.00,LifePoint acquisition completion,LifePoint shareholders received $65 cash per share.
+ABMD,2022-12-22,380.00,Johnson & Johnson acquisition completion,Uses only the $380 upfront cash consideration; deliberately excludes the contingent value right.
+ARRS,2019-04-04,31.75,CommScope acquisition completion,ARRIS acquired for $31.75 cash per share.
+CVET,2022-10-13,21.00,Covetrus acquisition completion,Covetrus acquired by CD&R and TPG for $21 cash per share.
+SWAV,2024-05-31,335.00,Johnson & Johnson acquisition completion,Shockwave Medical acquired for $335 cash per share.
+JWN,2025-05-20,24.25,Nordstrom acquisition completion,Nordstrom acquired for $24.25 cash per share.

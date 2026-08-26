@@ -1,0 +1,30 @@
+{
+  "strategy_id": "midcap_golden_10m6m3m",
+  "research_only": true,
+  "universe": "SP400_APPROX_POINT_IN_TIME_PROXY",
+  "momentum_rule": "10M>6M>3M>0",
+  "lookback_sessions": {"10M": 210, "6M": 126, "3M": 63},
+  "ranking_horizon": "10M",
+  "entry": {
+    "frequency": "monthly",
+    "nominal_calendar_day": 14,
+    "non_trading_day_policy": "first_trading_session_on_or_after",
+    "signal_information": "immediately_preceding_completed_close",
+    "execution_price": "entry_session_adjusted_open"
+  },
+  "portfolio": {
+    "initial_capital": 12000.0,
+    "fixed_sleeves": 3,
+    "initial_capital_per_sleeve": 4000.0,
+    "candidate_depth": 20,
+    "duplicate_active_tickers": false,
+    "renewal_mode": "fixed_monthly_vintage"
+  },
+  "exit": {
+    "holding_weeks": 12,
+    "close_confirmed_stop": 0.30,
+    "stop_execution": "next_session_open"
+  },
+  "costs": {"entry": 0.001, "exit": 0.001},
+  "membership_limitation": "Wikipedia selected-change history is an approximate, auditable proxy and not official complete S&P 400 history."
+}

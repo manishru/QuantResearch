@@ -17,6 +17,46 @@ P1.1 core infrastructure is implemented:
 
 No market-data file is read or modified by P1.1.
 
+## Midcap Golden strategy
+
+`midcap_golden_10m6m3m` is the frozen name for the reviewed monthly S&P 400
+momentum research strategy. Its machine-readable contract is stored in
+`config/strategies/midcap_golden_10m6m3m.json`.
+
+The rule and execution policy are:
+
+- use effective-dated S&P 400 proxy membership at the signal and entry dates;
+- calculate 210-, 126-, and 63-session total returns from the immediately
+  preceding completed close;
+- require `10M > 6M > 3M > 0` and rank qualifiers by highest 10M return;
+- enter monthly on the 14th, or the first trading session afterward, at the
+  modeled adjusted open;
+- start with $12,000 divided into three fixed $4,000 monthly sleeves;
+- avoid a ticker already active in another sleeve, searching through the first
+  20 ranked candidates;
+- hold for 12 calendar weeks, or exit a 30% close-confirmed stop at the next
+  session open;
+- charge 0.10% at entry and 0.10% at exit, then reinvest each sleeve's actual
+  proceeds on its fixed cadence.
+
+Run the frozen strategy:
+
+```bash
+PYTHONPATH=src:scripts .venv/bin/python scripts/run_midcap_golden.py \
+  --start 2016-01-01 \
+  --end 2026-08-26 \
+  --database data/validated/sp400/eodhd_sp400_proxy_eod.duckdb \
+  --membership reports/sp400_wikipedia_reverse_membership_2016_2026/membership_intervals.csv \
+  --corporate-action-exits config/experiments/sp400_proxy_corporate_action_exits.csv \
+  --output reports/midcap_golden_10m6m3m
+```
+
+The runner writes a configuration summary and complete entry/exit ledger. This
+is retrospective research, not investment advice. The historical S&P 400
+membership is reconstructed from Wikipedia selected changes and is therefore an
+auditable approximation, not official complete index history. The selected
+parameters also carry in-sample and multiple-testing risk.
+
 ## Requirements
 
 - Python 3.12 or newer (the project is tested locally with Python 3.14)
